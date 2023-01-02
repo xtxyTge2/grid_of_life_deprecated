@@ -52,7 +52,6 @@ public:
 };
 
 
-
 class DrawingEventQueue {
 public:
 	DrawingEventQueue() {
@@ -105,27 +104,39 @@ public:
 
 	int row{ 0 };
 	int column{ 0 };
-	SDL_Rect rect{0, 0, 0, 0};
+	SDL_Rect rect{ 0, 0, 0, 0 };
 
 	int number_of_neighbours{ 0 };
-	bool is_alive{false};
+	bool is_alive{ false };
 	bool prev_is_alive{ false };
 };
 
-class Grid {
+class DrawingGrid {
 public:
-	Grid(int rows1, int columns1) {
+	DrawingGrid(int x, int y, int width1, int height1, int rows1, int columns1) {
+		grid_top_left_x = x;
+		grid_top_left_y = y;
+		width = width1;
+		height = height1;
+
 		rows = rows1;
 		columns = columns1;
-
 		grid_data = new GridRectangle[rows * columns];
 
+
+		rect_width = width / columns;
+		rect_height = height / rows;
 		for (int r = 0; r < rows; r++) {
 			for (int c = 0; c < columns; c++) {
 				grid_data[index(r, c)].init(r, c);
+
+				grid_data[index(r, c)].rect.x = grid_top_left_x + c * rect_width;
+				grid_data[index(r, c)].rect.y = grid_top_left_y + r * rect_height;
+				grid_data[index(r, c)].rect.w = rect_width;
+				grid_data[index(r, c)].rect.h = rect_height;
 			}
 		}
-	};
+	}
 
 	void update_neighbour_count() {
 		for (int r = 0; r < rows; r++) {
@@ -188,90 +199,18 @@ public:
 		return r + c * rows;
 	}
 
-	int rows;
-	int columns;
-	GridRectangle* grid_data;
-	GridRectangle* prev_grid_data;
-};
-
-class DrawingGrid {
-public:
-	DrawingGrid(Grid* g, int x, int y, int width1, int height1) {
-		grid = g;
-		grid_top_left_x = x;
-		grid_top_left_y = y;
-		width = width1;
-		height = height1;
-
-		rows = grid->rows;
-		columns = grid->columns;
-
-
-		rect_width = width / columns;
-		rect_height = height / rows;
-
-		for (int r = 0; r < rows; r++) {
-			for (int c = 0; c < columns; c++) {
-				grid->grid_data[index(r, c)].rect.x = grid_top_left_x + c * rect_width;
-				grid->grid_data[index(r, c)].rect.y = grid_top_left_y + r * rect_height;
-				grid->grid_data[index(r, c)].rect.w = rect_width;
-				grid->grid_data[index(r, c)].rect.h = rect_height;
-			}
-		}
-	}
-
-	int index(int r, int c) {
-		return r + c * rows;
-	}
-	/*
-	void draw(SDL_Renderer* renderer) {
-		draw_grid_rectangles(renderer);
-		draw_grid_lines(renderer);
-	}
-
-	void draw_grid_lines(SDL_Renderer* renderer) {
-		SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
-		for (int r = 1; r < grid->rows; r++) {
-			SDL_Rect first_rect_in_row = grid->grid_data[index(r, 0)].rect;
-			SDL_Rect last_rect_in_row = grid->grid_data[index(r, grid->columns - 1)].rect;
-			SDL_RenderDrawLine(renderer, first_rect_in_row.x, first_rect_in_row.y, last_rect_in_row.x + rect_width, last_rect_in_row.y);
-		}
-
-		for (int c = 0; c < grid->columns; c++) {
-			SDL_Rect first_rect_in_column = grid->grid_data[index(0, c)].rect;
-			SDL_Rect last_rect_in_column = grid->grid_data[index(grid->rows - 1, c)].rect;
-			SDL_RenderDrawLine(renderer, first_rect_in_column.x, first_rect_in_column.y, last_rect_in_column.x, last_rect_in_column.y + rect_height);
-		}
-	}
-
-	void draw_grid_rectangles(SDL_Renderer* renderer) {
-		for (int r = 0; r < grid->rows; r++) {
-			for (int c = 0; c < grid->columns; c++) {
-				SDL_Rect currentRect = grid->grid_data[index(r, c)].rect;
-				//cout << "x: " << currentRect.x << " ,y: " << currentRect.y << " ,w: " << currentRect.w << " ,h: " << currentRect.h << endl;
-				if (grid->get(r, c).is_alive) {
-					SDL_SetRenderDrawColor(renderer, 255, 255, 0, 255);
-				} else {
-					SDL_SetRenderDrawColor(renderer, 128, 128, 128, 255);
-				}
-				SDL_RenderFillRect(renderer, &currentRect);
-			}
-		}
-	}
-	*/
-
 	void append_drawing_events(DrawingEventQueue* event_queue) {
 		GridRectangle* current_grid_rectangle = nullptr;
-		for (int r = 0; r < grid->rows; r++) {
-			for (int c = 0; c < grid->columns; c++) {
-				current_grid_rectangle = grid->get(r, c);
+		for (int r = 0; r < rows; r++) {
+			for (int c = 0; c < columns; c++) {
+				current_grid_rectangle = get(r, c);
 				current_grid_rectangle->append_drawing_events(event_queue);
 			}
 		}
 
-		for (int r = 1; r < grid->rows; r++) {
-			SDL_Rect first_rect_in_row = grid->get(r, 0)->rect;
-			SDL_Rect last_rect_in_row = grid->get(r, grid->columns - 1)->rect;
+		for (int r = 1; r < rows; r++) {
+			SDL_Rect first_rect_in_row = get(r, 0)->rect;
+			SDL_Rect last_rect_in_row = get(r, columns - 1)->rect;
 
 			int x1 = first_rect_in_row.x;
 			int y1 = first_rect_in_row.y;
@@ -282,9 +221,9 @@ public:
 			event_queue->line_events->push_back(*event);
 		}
 
-		for (int c = 1; c < grid->columns; c++) {
-			SDL_Rect first_rect_in_column = grid->get(0, c)->rect;
-			SDL_Rect last_rect_in_column = grid->get(grid->rows - 1, c)->rect;
+		for (int c = 1; c < columns; c++) {
+			SDL_Rect first_rect_in_column = get(0, c)->rect;
+			SDL_Rect last_rect_in_column = get(rows - 1, c)->rect;
 
 			int x1 = first_rect_in_column.x;
 			int y1 = first_rect_in_column.y;
@@ -312,7 +251,7 @@ public:
 
 		std::cout << "r: " << r << " c: " << c << std::endl;
 
-		return &grid->grid_data[index(r, c)];
+		return &grid_data[index(r, c)];
 	}
 
 	SDL_Renderer* renderer;
@@ -326,12 +265,13 @@ public:
 
 	int rect_width;
 	int rect_height;
-	Grid* grid;
+
+	GridRectangle* grid_data;
 };
 
 class DrawingWindow {
 public:
-	DrawingWindow(int w, int h, Grid* grid);
+	DrawingWindow(int width, int height, int rows, int columns);
 
 	void init() {
 		SDL_Rect background_rect_temp = { 0, 0, width, height };
@@ -349,7 +289,7 @@ public:
 		int drawing_grid_width = grid_bottom_right_x - grid_top_left_x;
 		int drawing_grid_height = grid_bottom_right_y - grid_top_left_y;
 
-		drawing_grid = new DrawingGrid(grid, grid_top_left_x, grid_top_left_y, drawing_grid_width, drawing_grid_height);
+		drawing_grid = new DrawingGrid(grid_top_left_x, grid_top_left_y, drawing_grid_width, drawing_grid_height, rows, columns);
 	}
 
 	bool is_inside(int x, int y) {
@@ -374,16 +314,16 @@ public:
 		drawing_grid->append_drawing_events(event_queue);
 	}
 
-private:
 	int width;
 	int height;
-	Grid* grid;
+	int rows;
+	int columns;
 	SDL_Rect* background_rect;
 	DrawingGrid* drawing_grid;
 };
 
-DrawingWindow::DrawingWindow(int w, int h, Grid* grid1)
-	: width(w), height(h), grid(grid1), background_rect(nullptr), drawing_grid(nullptr) {}
+DrawingWindow::DrawingWindow(int width, int height, int rows, int columns)
+	: width(width), height(height), rows(rows), columns(columns), background_rect(nullptr), drawing_grid(nullptr) {}
 
 
 
@@ -391,6 +331,42 @@ DrawingWindow::DrawingWindow(int w, int h, Grid* grid1)
 class State {
 public:
 	State(int width, int height, int rows, int columns);
+
+	bool init() {
+		if (SDL_Init(SDL_INIT_EVERYTHING) < 0) {
+			std::cout << "Error initializing SDL: " << SDL_GetError() << std::endl;
+			system("pause");
+			return false;
+		}
+
+		window = SDL_CreateWindow("Example", SDL_WINDOWPOS_UNDEFINED,
+			SDL_WINDOWPOS_UNDEFINED, width, height,
+			SDL_WINDOW_SHOWN);
+		if (!window) {
+			std::cout << "Error creating window: " << SDL_GetError() << std::endl;
+			system("pause");
+			return false;
+		}
+
+		renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
+		if (!renderer) {
+			std::cout << "Error creating renderer: " << SDL_GetError() << std::endl;
+			return false;
+		}
+
+		SDL_RenderClear(renderer);
+
+		drawing_event_queue = new DrawingEventQueue();
+
+		const int grid_rows = rows;
+		const int grid_columns = columns;
+
+		drawing_window = new DrawingWindow(width, height, rows, columns);
+		drawing_window->init();
+		update();
+	}
+
+
 
 	bool loop() {
 		static const unsigned char* keys = SDL_GetKeyboardState(NULL);
@@ -405,7 +381,6 @@ public:
 
 		int r = -1;
 		int c = -1;
-		SDL_Rect mouse_rect;
 		// Event loop
 		while (SDL_PollEvent(&event) != 0) {
 			switch (event.type) {
@@ -443,7 +418,7 @@ public:
 	}
 
 	void update() {
-		grid->updateGrid();
+		drawing_window->drawing_grid->updateGrid();
 		iteration++;
 		std::cout << "Iteration: " << iteration << " , updating grid." << std::endl;
 	}
@@ -465,46 +440,10 @@ public:
 		SDL_Quit();
 	}
 
-	bool init() {
-		if (SDL_Init(SDL_INIT_EVERYTHING) < 0) {
-			std::cout << "Error initializing SDL: " << SDL_GetError() << std::endl;
-			system("pause");
-			return false;
-		}
-
-		window = SDL_CreateWindow("Example", SDL_WINDOWPOS_UNDEFINED,
-			SDL_WINDOWPOS_UNDEFINED, width, height,
-			SDL_WINDOW_SHOWN);
-		if (!window) {
-			std::cout << "Error creating window: " << SDL_GetError() << std::endl;
-			system("pause");
-			return false;
-		}
-
-		renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
-		if (!renderer) {
-			std::cout << "Error creating renderer: " << SDL_GetError() << std::endl;
-			return false;
-		}
-
-		SDL_RenderClear(renderer);
-
-		drawing_event_queue = new DrawingEventQueue();
-
-		const int grid_rows = rows;
-		const int grid_columns = columns;
-
-		grid = new Grid(grid_rows, grid_columns);
-
-		drawing_window = new DrawingWindow(width, height, grid);
-		drawing_window->init();
-		update();
-	}
 private:
 	SDL_Window* window;
 	SDL_Renderer* renderer;
 	DrawingWindow* drawing_window;
-	Grid* grid;
 	int width;
 	int height;
 	int rows;
@@ -517,7 +456,7 @@ private:
 
 State::State(int width, int height, int rows, int columns)
 	: width(width), height(height), rows(rows), columns(columns), iteration(0), window(nullptr), renderer(nullptr),
-	drawing_window(nullptr), grid(nullptr), drawing_event_queue(nullptr) {}
+	drawing_window(nullptr), drawing_event_queue(nullptr) {}
 
 int main(int argc, char** args) {
 	State* state = new State(800, 600, 20, 20);
