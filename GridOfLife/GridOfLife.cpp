@@ -1,7 +1,8 @@
 #include <iostream>
+#include <tuple>
 #include <SDL.h>
 
-using namespace std;
+
 class Grid {
 public:
 	Grid(int rows1, int columns1) {
@@ -37,6 +38,9 @@ public:
 				}
 			}
 		}
+	}
+	void flip_state(int r, int c) {
+		grid_data[index(r, c)] = !grid_data[index(r, c)];
 	}
 
 	void updateGrid() {
@@ -79,6 +83,7 @@ public:
 	void set(int r, int c, bool value) {
 		grid_data[index(r, c)] = value;
 	}
+
 	int rows;
 	int columns;
 	bool* grid_data;
@@ -98,8 +103,8 @@ public:
 
 		grid_rects = new SDL_Rect[rows * columns];
 
-		int rect_width = width / columns;
-		int rect_height = height / rows;
+		rect_width = width / columns;
+		rect_height = height / rows;
 
 		for (int r = 0; r < rows; r++) {
 			for (int c = 0; c < columns; c++) {
@@ -125,7 +130,7 @@ public:
 				SDL_Rect currentRect = grid_rects[index(r, c)];
 				//cout << "x: " << currentRect.x << " ,y: " << currentRect.y << " ,w: " << currentRect.w << " ,h: " << currentRect.h << endl;
 				if (grid->get(r, c)) {
-					SDL_SetRenderDrawColor(renderer,255 , 255, 0, 255);
+					SDL_SetRenderDrawColor(renderer, 255, 255, 0, 255);
 				} else {
 					SDL_SetRenderDrawColor(renderer, 128, 128, 128, 255);
 				}
@@ -133,6 +138,26 @@ public:
 			}
 		}
 	}
+
+	bool is_inside(int x, int y) {
+		return (x >= grid_top_left_x && x <= grid_top_left_x + width) && (y >= grid_top_left_y && y <= grid_top_left_y + height);
+	}
+
+	std::tuple<int, int, SDL_Rect*> get_rectangle(int x, int y) {
+		if (!is_inside(x, y)) {
+			return { -1, -1, nullptr };
+		}
+		int relative_x = x - grid_top_left_x;
+		int relative_y = y - grid_top_left_y;
+
+		int r = (int)relative_y / rect_height;
+		int c = (int)relative_x / rect_width;
+
+		std::cout << "r: " << r << " c: " << c << std::endl;
+
+		return { r, c, &grid_rects[index(r, c)] };
+	}
+
 	SDL_Renderer* renderer;
 	int grid_top_left_x;
 	int grid_top_left_y;
@@ -140,6 +165,9 @@ public:
 	int height;
 	int rows;
 	int columns;
+
+	int rect_width;
+	int rect_height;
 	Grid* grid;
 	SDL_Rect* grid_rects;
 };
@@ -152,11 +180,14 @@ public:
 		SDL_Rect background_rect_temp = { 0, 0, width, height };
 		background_rect = &background_rect_temp;
 
-		int grid_top_left_x = background_rect->x + int(0.2 * background_rect->w);
-		int grid_top_left_y = background_rect->y + int(0.2 * background_rect->h);
+		int grid_side_length = std::min(background_rect->w, background_rect->h);
 
-		int grid_bottom_right_x = background_rect->x + int(0.8 * background_rect->w);
-		int grid_bottom_right_y = background_rect->y + int(0.8 * background_rect->h);
+		int grid_top_left_x = background_rect->x + (int)(0.2 * grid_side_length);
+		int grid_top_left_y = background_rect->y + (int)(0.2 * grid_side_length);
+
+		int grid_bottom_right_x = background_rect->x + (int)(0.8 * grid_side_length);
+		int grid_bottom_right_y = background_rect->y + (int)(0.8 * grid_side_length);
+
 
 		int drawing_grid_width = grid_bottom_right_x - grid_top_left_x;
 		int drawing_grid_height = grid_bottom_right_y - grid_top_left_y;
@@ -168,6 +199,21 @@ public:
 		SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
 		SDL_RenderFillRect(renderer, background_rect);
 		drawing_grid->draw(renderer);
+	}
+
+	bool is_inside(int x, int y) {
+		return (x >= background_rect->x && x <= background_rect->x + width) && (y >= background_rect->y && y <= background_rect->y + height);
+	}
+
+	bool is_inside_grid(int x, int y) {
+		return drawing_grid->is_inside(x, y);
+	}
+
+	std::tuple<int, int, SDL_Rect*> get_rectangle(int x, int y) {
+		if (!is_inside_grid(x, y)) {
+			return { -1, -1, nullptr };
+		}
+		return drawing_grid->get_rectangle(x, y);
 	}
 
 private:
@@ -190,30 +236,39 @@ public:
 		static const unsigned char* keys = SDL_GetKeyboardState(NULL);
 
 		SDL_Event event;
-		SDL_Rect rect;
-		// For mouse rectangle (static to persist between function calls)
-		static int mx0 = -1, my0 = -1, mx1 = -1, my1 = -1;
 
 		// Clear the window to white
-
 		SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
 		SDL_RenderClear(renderer);
+		bool is_inside = false;
+		//SDL_Rect* mouse_rect = nullptr;
+		int mouse_x = -1;
+		int mouse_y = -1;
 
+		std::tuple<int, int, SDL_Rect*> t;
+		int r = -1;
+		int c = -1;
+		SDL_Rect* mouse_rect = nullptr;
 		// Event loop
 		while (SDL_PollEvent(&event) != 0) {
 			switch (event.type) {
 			case SDL_QUIT:
 				return false;
 			case SDL_MOUSEBUTTONDOWN:
-				mx0 = event.button.x;
-				my0 = event.button.y;
 				break;
 			case SDL_MOUSEMOTION:
-				mx1 = event.button.x;
-				my1 = event.button.y;
 				break;
 			case SDL_MOUSEBUTTONUP:
-				mx0 = my0 = mx1 = my1 = -1;
+				mouse_x = event.button.x;
+				mouse_y = event.button.y;
+				t = drawing_window->get_rectangle(mouse_x, mouse_y);
+				r = std::get<0>(t);
+				c = std::get<1>(t);
+				mouse_rect = std::get<2>(t);
+
+				if (r != -1 && c != -1 && mouse_rect) {
+					grid->flip_state(r, c);
+				}
 				break;
 			case SDL_KEYDOWN:
 				switch (event.key.keysym.sym) {
@@ -222,12 +277,12 @@ public:
 				case SDLK_DOWN:
 					break;
 				case SDLK_RIGHT:
-					cout << "Updating grid." << endl;
-					//grid->updateGrid();
-					//drawing_window->draw(renderer);
+					std::cout << "Updating grid." << std::endl;
+					grid->updateGrid();
+					drawing_window->draw(renderer);
 
 					// Update window
-					//SDL_RenderPresent(renderer);
+					SDL_RenderPresent(renderer);
 					break;
 				}
 				break;
@@ -238,6 +293,7 @@ public:
 		//if (keys[SDL_SCANCODE_1]) {
 		//	updateGrid();
 		//}
+		//grid->updateGrid();
 		drawing_window->draw(renderer);
 
 		// Update window
@@ -255,7 +311,7 @@ public:
 
 	bool init() {
 		if (SDL_Init(SDL_INIT_EVERYTHING) < 0) {
-			cout << "Error initializing SDL: " << SDL_GetError() << endl;
+			std::cout << "Error initializing SDL: " << SDL_GetError() << std::endl;
 			system("pause");
 			return false;
 		}
@@ -264,14 +320,14 @@ public:
 			SDL_WINDOWPOS_UNDEFINED, width, height,
 			SDL_WINDOW_SHOWN);
 		if (!window) {
-			cout << "Error creating window: " << SDL_GetError() << endl;
+			std::cout << "Error creating window: " << SDL_GetError() << std::endl;
 			system("pause");
 			return false;
 		}
 
 		renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
 		if (!renderer) {
-			cout << "Error creating renderer: " << SDL_GetError() << endl;
+			std::cout << "Error creating renderer: " << SDL_GetError() << std::endl;
 			return false;
 		}
 
@@ -279,27 +335,10 @@ public:
 
 		const int grid_rows = rows;
 		const int grid_columns = columns;
-		Grid* grid = new Grid(grid_rows, grid_columns);
-		
-		int x = 2;
-		int y = 2;
-		grid->set(x, y, true);
-		grid->set(x - 1, y - 1, true);
 
-		int a = 10;
-		int b = 10;
-
-		grid->set(a - 1, b - 1, true);
-		grid->set(a - 1, b + 1, true);
-		grid->set(a, b - 1, true);
-		grid->set(a, b, true);
-		grid->set(a + 1, b, true);
-		grid->set(a + 1, b + 1, true);
-
+		grid = new Grid(grid_rows, grid_columns);
 
 		drawing_window = new DrawingWindow(width, height, grid);
-		//SDL_Rect background_rect = { 0, 0, width, height };
-		//drawing_window->set_background_rect(&background_rect);
 		drawing_window->init();
 	}
 private:
@@ -318,7 +357,7 @@ State::State(int width, int height, int rows, int columns)
 
 
 int main(int argc, char** args) {
-	State* state = new State(800, 600, 20, 30);
+	State* state = new State(800, 600, 30, 30);
 	if (!state->init()) {
 		return 1;
 	}
