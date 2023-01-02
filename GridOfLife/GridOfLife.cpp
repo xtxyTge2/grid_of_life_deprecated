@@ -2,21 +2,40 @@
 #include <tuple>
 #include <SDL.h>
 
+class GridRectangle {
+public:
+	GridRectangle() {}
+
+	void init(int r, int c) {
+		row = r;
+		column = c;
+
+		number_of_neighbours = 0;
+		is_alive = false;
+		prev_is_alive = false;
+	}
+	int row;
+	int column;
+	SDL_Rect rect;
+
+	int number_of_neighbours;
+	bool is_alive;
+	bool prev_is_alive;
+};
+
+
 
 class Grid {
 public:
 	Grid(int rows1, int columns1) {
 		rows = rows1;
 		columns = columns1;
-		grid_data = new bool[rows * columns];
-		prev_grid_data = new bool[rows * columns];
-		neighbour_count_data = new int[rows * columns];
+
+		grid_data = new GridRectangle[rows*columns];
 
 		for (int r = 0; r < rows; r++) {
 			for (int c = 0; c < columns; c++) {
-				grid_data[index(r, c)] = false;
-				prev_grid_data[index(r, c)] = false;
-				neighbour_count_data[index(r, c)] = false;
+				grid_data[index(r, c)].init(r, c);
 			}
 		}
 	};
@@ -24,71 +43,67 @@ public:
 	void update_neighbour_count() {
 		for (int r = 0; r < rows; r++) {
 			for (int c = 0; c < columns; c++) {
-				neighbour_count_data[index(r, c)] = 0;
+				grid_data[index(r, c)].number_of_neighbours = 0;
 				for (int dr = -1; dr <= 1; dr++) {
 					for (int dc = -1; dc <= 1; dc++) {
 						int n_r = r + dr;
 						int n_c = c + dc;
 						if (dr == 0 && dc == 0) continue;
 						if (n_r < 0 || n_r >= rows || n_c < 0 || n_c >= columns) continue;
-						if (grid_data[index(n_r, n_c)]) {
-							neighbour_count_data[index(r, c)] += 1;
+						if (grid_data[index(n_r, n_c)].is_alive) {
+							grid_data[index(r, c)].number_of_neighbours += 1;
 						}
 					}
 				}
 			}
 		}
 	}
+
 	void flip_state(int r, int c) {
-		grid_data[index(r, c)] = !grid_data[index(r, c)];
+		grid_data[index(r, c)].is_alive = !grid_data[index(r, c)].is_alive;
 	}
 
 	void updateGrid() {
 		// Copy grid into previous grid for next iteration.
 		for (int r = 0; r < rows; r++) {
 			for (int c = 0; c < columns; c++) {
-				prev_grid_data[index(r, c)] = grid_data[index(r, c)];
+				grid_data[index(r, c)].prev_is_alive = grid_data[index(r, c)].is_alive;
 			}
 		}
 
 		update_neighbour_count();
 		for (int r = 0; r < rows; r++) {
 			for (int c = 0; c < columns; c++) {
-				int neighbours_count = neighbour_count_data[index(r, c)];
-				if (prev_grid_data[index(r, c)]) {
+				int neighbours_count = grid_data[index(r, c)].number_of_neighbours;
+				if (grid_data[index(r, c)].prev_is_alive) {
 					if (neighbours_count == 2 || neighbours_count == 3) {
-						grid_data[index(r, c)] = true;
+						grid_data[index(r, c)].is_alive = true;
 					} else {
-						grid_data[index(r, c)] = false;
+						grid_data[index(r, c)].is_alive = false;
 					}
 				} else {
 					if (neighbours_count == 3) {
-						grid_data[index(r, c)] = true;
+						grid_data[index(r, c)].is_alive = true;
 					} else {
-						grid_data[index(r, c)] = false;
+						grid_data[index(r, c)].is_alive = false;
 					}
 				}
 			}
 		}
 	}
 
+	GridRectangle get(int r, int c) {
+		return grid_data[index(r, c)];
+	}
+
 	int index(int r, int c) {
 		return r + c * rows;
 	}
 
-	bool get(int r, int c) {
-		return grid_data[index(r, c)];
-	}
-
-	void set(int r, int c, bool value) {
-		grid_data[index(r, c)] = value;
-	}
-
 	int rows;
 	int columns;
-	bool* grid_data;
-	int* neighbour_count_data;
-	bool* prev_grid_data;
+	GridRectangle* grid_data;
+	GridRectangle* prev_grid_data;
 };
 class DrawingGrid {
 public:
@@ -101,17 +116,16 @@ public:
 		rows = grid->rows;
 		columns = grid->columns;
 
-		grid_rects = new SDL_Rect[rows * columns];
 
 		rect_width = width / columns;
 		rect_height = height / rows;
 
 		for (int r = 0; r < rows; r++) {
 			for (int c = 0; c < columns; c++) {
-				grid_rects[index(r, c)].x = grid_top_left_x + c * rect_width;
-				grid_rects[index(r, c)].y = grid_top_left_y + r * rect_height;
-				grid_rects[index(r, c)].w = rect_width;
-				grid_rects[index(r, c)].h = rect_height;
+				grid->grid_data[index(r, c)].rect.x = grid_top_left_x + c * rect_width;
+				grid->grid_data[index(r, c)].rect.y = grid_top_left_y + r * rect_height;
+				grid->grid_data[index(r, c)].rect.w = rect_width;
+				grid->grid_data[index(r, c)].rect.h = rect_height;
 			}
 		}
 	}
@@ -120,9 +134,6 @@ public:
 		return r + c * rows;
 	}
 
-	SDL_Rect get(int r, int c) {
-		return grid_rects[index(r, c)];
-	}
 
 	void draw(SDL_Renderer* renderer) {
 		draw_grid_rectangles(renderer);
@@ -132,14 +143,14 @@ public:
 	void draw_grid_lines(SDL_Renderer* renderer) {
 		SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
 		for (int r = 1; r < grid->rows; r++) {
-			SDL_Rect first_rect_in_row = grid_rects[index(r, 0)];
-			SDL_Rect last_rect_in_row = grid_rects[index(r, grid->columns - 1)];
+			SDL_Rect first_rect_in_row = grid->grid_data[index(r, 0)].rect;
+			SDL_Rect last_rect_in_row = grid->grid_data[index(r, grid->columns - 1)].rect;
 			SDL_RenderDrawLine(renderer, first_rect_in_row.x, first_rect_in_row.y, last_rect_in_row.x + rect_width, last_rect_in_row.y);
 		}
 
 		for (int c = 0; c < grid->columns; c++) {
-			SDL_Rect first_rect_in_column = grid_rects[index(0, c)];
-			SDL_Rect last_rect_in_column = grid_rects[index(grid->rows - 1, c)];
+			SDL_Rect first_rect_in_column = grid->grid_data[index(0, c)].rect;
+			SDL_Rect last_rect_in_column = grid->grid_data[index(grid->rows - 1, c)].rect;
 			SDL_RenderDrawLine(renderer, first_rect_in_column.x, first_rect_in_column.y, last_rect_in_column.x, last_rect_in_column.y + rect_height);
 		}
 	}
@@ -147,9 +158,9 @@ public:
 	void draw_grid_rectangles(SDL_Renderer* renderer) {
 		for (int r = 0; r < grid->rows; r++) {
 			for (int c = 0; c < grid->columns; c++) {
-				SDL_Rect currentRect = grid_rects[index(r, c)];
+				SDL_Rect currentRect = grid->grid_data[index(r, c)].rect;
 				//cout << "x: " << currentRect.x << " ,y: " << currentRect.y << " ,w: " << currentRect.w << " ,h: " << currentRect.h << endl;
-				if (grid->get(r, c)) {
+				if (grid->get(r, c).is_alive) {
 					SDL_SetRenderDrawColor(renderer, 255, 255, 0, 255);
 				} else {
 					SDL_SetRenderDrawColor(renderer, 128, 128, 128, 255);
@@ -166,9 +177,9 @@ public:
 		return (x >= grid_top_left_x && x <= grid_top_left_x + width) && (y >= grid_top_left_y && y <= grid_top_left_y + height);
 	}
 
-	std::tuple<int, int, SDL_Rect*> get_rectangle(int x, int y) {
+	GridRectangle* get_rectangle(int x, int y) {
 		if (!is_inside(x, y)) {
-			return { -1, -1, nullptr };
+			return nullptr;
 		}
 		int relative_x = x - grid_top_left_x;
 		int relative_y = y - grid_top_left_y;
@@ -178,12 +189,13 @@ public:
 
 		std::cout << "r: " << r << " c: " << c << std::endl;
 
-		return { r, c, &grid_rects[index(r, c)] };
+		return &grid->grid_data[index(r, c)];
 	}
 
 	SDL_Renderer* renderer;
 	int grid_top_left_x;
 	int grid_top_left_y;
+	
 	int width;
 	int height;
 	int rows;
@@ -192,7 +204,6 @@ public:
 	int rect_width;
 	int rect_height;
 	Grid* grid;
-	SDL_Rect* grid_rects;
 };
 
 class DrawingWindow {
@@ -232,9 +243,9 @@ public:
 		return drawing_grid->is_inside(x, y);
 	}
 
-	std::tuple<int, int, SDL_Rect*> get_rectangle(int x, int y) {
+	GridRectangle* get_rectangle(int x, int y) {
 		if (!is_inside_grid(x, y)) {
-			return { -1, -1, nullptr };
+			return nullptr;
 		}
 		return drawing_grid->get_rectangle(x, y);
 	}
@@ -261,17 +272,14 @@ public:
 		SDL_Event event;
 
 		// Clear the window to white
-		SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
-		SDL_RenderClear(renderer);
 		bool is_inside = false;
-		//SDL_Rect* mouse_rect = nullptr;
 		int mouse_x = -1;
 		int mouse_y = -1;
+		GridRectangle* clickedRectangle = nullptr;
 
-		std::tuple<int, int, SDL_Rect*> t;
 		int r = -1;
 		int c = -1;
-		SDL_Rect* mouse_rect = nullptr;
+		SDL_Rect mouse_rect;
 		// Event loop
 		while (SDL_PollEvent(&event) != 0) {
 			switch (event.type) {
@@ -284,13 +292,10 @@ public:
 			case SDL_MOUSEBUTTONUP:
 				mouse_x = event.button.x;
 				mouse_y = event.button.y;
-				t = drawing_window->get_rectangle(mouse_x, mouse_y);
-				r = std::get<0>(t);
-				c = std::get<1>(t);
-				mouse_rect = std::get<2>(t);
 
-				if (r != -1 && c != -1 && mouse_rect) {
-					grid->flip_state(r, c);
+				clickedRectangle = drawing_window->get_rectangle(mouse_x, mouse_y);
+				if (clickedRectangle) {
+					clickedRectangle->is_alive = !clickedRectangle->is_alive;
 				}
 				break;
 			case SDL_KEYDOWN:
@@ -299,31 +304,31 @@ public:
 					break;
 				case SDLK_DOWN:
 					break;
-				case SDLK_RIGHT:
-					std::cout << "Updating grid." << std::endl;
-					grid->updateGrid();
-					drawing_window->draw(renderer);
-
-					// Update window
-					SDL_RenderPresent(renderer);
+				case SDLK_RIGHT:		
+					update();
 					break;
 				}
 				break;
 			}
 		}
+		draw();
+		return true;
+	}
 
-		// Test key states - this could also be done with events
-		//if (keys[SDL_SCANCODE_1]) {
-		//	updateGrid();
-		//}
-		//grid->updateGrid();
+	void update() {
+		grid->updateGrid();
+		iteration++;
+		std::cout << "Iteration: " << iteration << " , updating grid." << std::endl;
+	}
+
+	void draw() {
+		SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+		SDL_RenderClear(renderer);
 		drawing_window->draw(renderer);
 
 		// Update window
 		SDL_RenderPresent(renderer);
-		return true;
 	}
-
 
 	void kill() {
 		// Quit
@@ -363,6 +368,7 @@ public:
 
 		drawing_window = new DrawingWindow(width, height, grid);
 		drawing_window->init();
+		update();
 	}
 private:
 	SDL_Window* window;
@@ -373,14 +379,16 @@ private:
 	int height;
 	int rows;
 	int columns;
+
+	int iteration;
 };
 State::State(int width, int height, int rows, int columns)
-	: width(width), height(height), rows(rows), columns(columns), window(nullptr), renderer(nullptr),
+	: width(width), height(height), rows(rows), columns(columns), iteration(0), window(nullptr), renderer(nullptr),
 	drawing_window(nullptr), grid(nullptr) {}
 
 
 int main(int argc, char** args) {
-	State* state = new State(800, 600, 30, 30);
+	State* state = new State(800, 600, 20, 20);
 	if (!state->init()) {
 		return 1;
 	}
