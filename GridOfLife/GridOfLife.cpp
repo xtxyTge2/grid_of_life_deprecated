@@ -125,6 +125,26 @@ public:
 	}
 
 	void draw(SDL_Renderer* renderer) {
+		draw_grid_rectangles(renderer);
+		draw_grid_lines(renderer);
+	}
+
+	void draw_grid_lines(SDL_Renderer* renderer) {
+		SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+		for (int r = 1; r < grid->rows; r++) {
+			SDL_Rect first_rect_in_row = grid_rects[index(r, 0)];
+			SDL_Rect last_rect_in_row = grid_rects[index(r, grid->columns - 1)];
+			SDL_RenderDrawLine(renderer, first_rect_in_row.x, first_rect_in_row.y, last_rect_in_row.x + rect_width, last_rect_in_row.y);
+		}
+
+		for (int c = 0; c < grid->columns; c++) {
+			SDL_Rect first_rect_in_column = grid_rects[index(0, c)];
+			SDL_Rect last_rect_in_column = grid_rects[index(grid->rows - 1, c)];
+			SDL_RenderDrawLine(renderer, first_rect_in_column.x, first_rect_in_column.y, last_rect_in_column.x, last_rect_in_column.y + rect_height);
+		}
+	}
+
+	void draw_grid_rectangles(SDL_Renderer* renderer) {
 		for (int r = 0; r < grid->rows; r++) {
 			for (int c = 0; c < grid->columns; c++) {
 				SDL_Rect currentRect = grid_rects[index(r, c)];
@@ -136,7 +156,10 @@ public:
 				}
 				SDL_RenderFillRect(renderer, &currentRect);
 			}
+
 		}
+
+
 	}
 
 	bool is_inside(int x, int y) {
