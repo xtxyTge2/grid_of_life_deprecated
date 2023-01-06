@@ -399,6 +399,8 @@ public:
 		//IM_ASSERT(font != NULL);
 
 		update();
+
+		grid = std::make_unique<std::vector<std::pair<int, int>>>();
 	}
 
 	void kill() {
@@ -450,8 +452,9 @@ public:
 			ImGui::Text("iteration = %d", iteration);
 
 			ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-			
+
 			static ImVector<ImVec2> points;
+
 			static ImVector<ImVec2> grid_rects;
 			static ImVec2 scrolling(0.0f, 0.0f);
 			static bool opt_enable_grid = true;
@@ -482,10 +485,10 @@ public:
 			// Draw border and background color
 			ImGuiIO& io = ImGui::GetIO();
 			ImDrawList* draw_list = ImGui::GetWindowDrawList();
-			
+
 			// grid background color
 			draw_list->AddRectFilled(canvas_p0, canvas_p1, IM_COL32(50, 50, 50, 255));
-			
+
 			// white boundaries of grid
 			draw_list->AddRect(canvas_p0, canvas_p1, IM_COL32(255, 255, 255, 255));
 
@@ -497,13 +500,38 @@ public:
 			const ImVec2 mouse_pos_in_canvas(io.MousePos.x - origin.x, io.MousePos.y - origin.y);
 
 			const float GRID_STEP = 32.0f;
+			/*
 			if (is_hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
 				const ImVec2 rect_p0 = ImVec2(mouse_pos_in_canvas.x, mouse_pos_in_canvas.y);
 				const ImVec2 rect_p1(rect_p0.x + GRID_STEP, rect_p0.y + GRID_STEP);
 				grid_rects.push_back(rect_p0);
 				grid_rects.push_back(rect_p1);
 			}
-			
+			*/
+			if (is_hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+				int x_absolute = (int)(mouse_pos_in_canvas.x / GRID_STEP);
+				int y_absolute = (int)(mouse_pos_in_canvas.y / GRID_STEP);
+
+				const ImVec2 rect_p0 = ImVec2(x_absolute * GRID_STEP, y_absolute * GRID_STEP);
+				const ImVec2 rect_p1(rect_p0.x + GRID_STEP, rect_p0.y + GRID_STEP);
+				grid_rects.push_back(rect_p0);
+				grid_rects.push_back(rect_p1);
+
+				bool was_alive = false;
+				std::pair<int, int> current_rect = std::make_pair(x_absolute, y_absolute);
+
+				for (int i = 0; i < grid->size(); i++) {
+					std::pair<int, int> rect = (*grid)[i];
+					if (current_rect.first == rect.first && current_rect.second == rect.second) {
+						grid->erase(grid->begin() + i);
+						was_alive = true;
+					}
+				}
+				if (!was_alive) {
+					grid->push_back(current_rect);
+				}
+			}
+
 			// Pan (we use a zero mouse threshold when there's no context menu)
 			// You may decide to make that threshold dynamic based on whether the mouse is hovering something etc.
 			const float mouse_threshold_for_pan = opt_enable_context_menu ? -1.0f : 0.0f;
@@ -516,7 +544,7 @@ public:
 			ImVec2 drag_delta = ImGui::GetMouseDragDelta(ImGuiMouseButton_Right);
 			if (opt_enable_context_menu && drag_delta.x == 0.0f && drag_delta.y == 0.0f)
 				ImGui::OpenPopupOnItemClick("context", ImGuiPopupFlags_MouseButtonRight);
-			
+
 			/* TODO
 			if (ImGui::BeginPopup("context")) {
 				if (adding_line)
@@ -527,6 +555,7 @@ public:
 				ImGui::EndPopup();
 			}
 			*/
+
 			// Draw grid + all lines in the canvas
 			draw_list->PushClipRect(canvas_p0, canvas_p1, true);
 			if (opt_enable_grid) {
@@ -536,13 +565,17 @@ public:
 					draw_list->AddLine(ImVec2(canvas_p0.x, canvas_p0.y + y), ImVec2(canvas_p1.x, canvas_p0.y + y), IM_COL32(200, 200, 200, 40));
 			}
 
-			for (int n = 0; n < grid_rects.Size; n += 2) {
-				const ImVec2 rect_p0(origin.x + grid_rects[n].x, origin.y + grid_rects[n].y);
-				const ImVec2 rect_p1(origin.x + grid_rects[n + 1].x, origin.y + grid_rects[n + 1].y);
+			for (int i = 0; i < grid->size(); i++) {
+				std::pair<int, int> current_rect = (*grid)[i];
+				int x_grid_coord = current_rect.first * GRID_STEP;
+				int y_grid_coord = current_rect.second * GRID_STEP;
+
+				const ImVec2 rect_p0(origin.x + x_grid_coord, origin.y + y_grid_coord);
+				const ImVec2 rect_p1(rect_p0.x + GRID_STEP, rect_p0.y + GRID_STEP);
 				draw_list->AddRectFilled(rect_p0, rect_p1, IM_COL32(255, 255, 0, 255));
 			}
 			draw_list->PopClipRect();
-			
+
 			ImGui::End();
 		}
 
@@ -588,6 +621,8 @@ public:
 
 	SDL_Window* window;
 	SDL_Renderer* renderer;
+
+	std::unique_ptr<std::vector<std::pair<int, int>>> grid;
 };
 
 
