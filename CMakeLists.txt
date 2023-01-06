@@ -29,13 +29,15 @@ target_sources(
 	gridoflife
 	PRIVATE
     ${SOURCE_DIR}/gridoflife.cpp
-    ${SOURCE_DIR}/internal_sdl_state.cpp
+    ${DEPENDENCIES_DIR}/imgui/backends/imgui_impl_sdl.cpp
+    ${DEPENDENCIES_DIR}/imgui/backends/imgui_impl_sdlrenderer.cpp
 )
 	
 target_include_directories(
 	gridoflife
 	PRIVATE
-	${SOURCE_DIR})
+	${SOURCE_DIR}
+)
 
 ########################################################################
 #                               IMGUI                                  #
@@ -50,10 +52,12 @@ add_library(imgui STATIC
     ${imgui_SOURCE_DIR}/imgui_demo.cpp
     ${imgui_SOURCE_DIR}/imgui_draw.cpp
     ${imgui_SOURCE_DIR}/imgui_tables.cpp
-    ${imgui_SOURCE_DIR}/imgui_widgets.cpp)
+    ${imgui_SOURCE_DIR}/imgui_widgets.cpp
+)
 target_include_directories(imgui PUBLIC
     ${imgui_SOURCE_DIR}/
-    ${imgui_SOURCE_DIR}/backends)
+    ${imgui_SOURCE_DIR}/backends
+)
 
 target_link_libraries(gridoflife PRIVATE imgui)
 
@@ -64,7 +68,7 @@ target_link_libraries(gridoflife PRIVATE imgui)
 
 # documentation: https://github.com/libsdl-org/SDL/blob/release-2.26.x/docs/README-cmake.md
 
-option(USE_SDL_VENDORED "Use SDL2 vendored libraries" ON)
+option(USE_SDL_VENDORED "Use SDL2 vendored libraries" OFF)
 
 if(USE_SDL_VENDORED)
     add_subdirectory(${DEPENDENCIES_DIR}/SDL2 EXCLUDE_FROM_ALL)
