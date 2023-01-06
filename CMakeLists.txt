@@ -64,7 +64,7 @@ target_link_libraries(gridoflife PRIVATE imgui)
 
 # documentation: https://github.com/libsdl-org/SDL/blob/release-2.26.x/docs/README-cmake.md
 
-option(USE_SDL_VENDORED "Use SDL2 vendored libraries" OFF)
+option(USE_SDL_VENDORED "Use SDL2 vendored libraries" ON)
 
 if(USE_SDL_VENDORED)
     add_subdirectory(${DEPENDENCIES_DIR}/SDL2 EXCLUDE_FROM_ALL)
