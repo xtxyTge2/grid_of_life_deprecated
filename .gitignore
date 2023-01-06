@@ -30,3 +30,7 @@
 *.exe
 *.out
 *.app
+/.vs/GridOfLife
+/deps/SDL2-devel-2.26.1-VC
+/GridOfLife/x64/Debug
+/x64/Debug
